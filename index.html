@@ -239,9 +239,14 @@
       .salary-panel { padding: 12px; }
       .location-panel { padding: 10px; }
       #work-location-input { min-width: 120px; }
+      /* switch to mobile list view (no horizontal scroll) */
+      #calendar { display: none; }
+      #calendar-mobile { display: block; }
       /* make table headers sticky on wide enough small screens when horizontally scrolled */
       .table-container { -webkit-overflow-scrolling: touch; }
     }
+    /* default: hide mobile container until used */
+    #calendar-mobile { display: none; }
     /* Mobile calendar styles */
     .calendar-mobile { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); padding: 8px; }
     .mobile-day { border-bottom: 1px solid #f0f0f0; padding: 10px 8px; display: flex; gap: 12px; align-items: flex-start; }
@@ -252,7 +257,11 @@
     .mobile-day .md-right { flex: 1; }
     .mobile-day .md-right .events { margin: 0; padding: 0; list-style: none; font-size: 0.95rem; }
     .mobile-day .md-right .events li { background: #eef6ff; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px; }
-    .mobile-day .md-right .events li.holiday { background: #fdecea; color: #c0392b; }
+  .mobile-day .md-right .events li.holiday { background: #fdecea; color: #c0392b; }
+  .mobile-day .md-left.sunday .daynum { color: #e74c3c; }
+  .mobile-day .md-left.saturday .daynum { color: #3498db; }
+  .mobile-day .md-left.sunday .weekday { color: #e74c3c; }
+  .mobile-day .md-left.saturday .weekday { color: #3498db; }
     .mobile-day .md-right .meta { font-size: 0.85rem; color: #4a90d9; font-weight: 600; margin-top: 6px; }
   </style>
 </head>
@@ -312,7 +321,7 @@
     </table>
   </div>
 
-  <div id="calendar-mobile" class="calendar-mobile" style="display:none;"></div>
+  <div id="calendar-mobile" class="calendar-mobile"></div>
 
   <div class="salary-panel location-panel" id="location-panel">
     <span id="location-date-label">날짜를 클릭한 뒤 출근 장소를 입력하세요</span>
@@ -750,7 +759,11 @@
           var weekdayLabel = ['일','월','화','수','목','금','토'][wd];
 
           html += '<div class="mobile-day" data-date="' + key + '">';
-          html += '<div class="md-left"><span class="weekday">' + weekdayLabel + '</span><span class="daynum">' + d + '</span></div>';
+            var leftClass = 'md-left';
+            if (wd === 0) leftClass += ' sunday';
+            if (wd === 6) leftClass += ' saturday';
+            html += '<div class="mobile-day" data-date="' + key + '">';
+            html += '<div class="' + leftClass + '"><span class="weekday">' + weekdayLabel + '</span><span class="daynum">' + d + '</span></div>';
           html += '<div class="md-right">';
           if (dayEvents.length) {
             html += '<ul class="events">';
