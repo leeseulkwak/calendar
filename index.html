@@ -954,18 +954,59 @@
 
         container.innerHTML = html;
 
-        // click handler to toggle worked
+        // touch-aware handlers: single tap = toggle worked, double-tap = open modal, long-press = open modal
         container.querySelectorAll('.mobile-day').forEach(function (el) {
+          // non-touch fallback: click/dblclick still work
           el.addEventListener('click', function () {
             toggleWorked(this.getAttribute('data-date'));
           });
           el.addEventListener('dblclick', function (e) { e.stopPropagation(); openModal(this.getAttribute('data-date')); });
-          // long-press for mobile: 600ms
+
+          // per-element touch timing state
+          var lastTap = 0;
+          var tapTimer = null;
           var pressTimer = null;
+
           el.addEventListener('touchstart', function (ev) {
-            pressTimer = setTimeout(function () { openModal(el.getAttribute('data-date')); }, 600);
+            // start long-press timer
+            if (pressTimer) clearTimeout(pressTimer);
+            pressTimer = setTimeout(function () {
+              // open modal on long-press
+              openModal(el.getAttribute('data-date'));
+              // cancel any pending single-tap action
+              if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
+              lastTap = 0;
+            }, 600);
+          }, { passive: true });
+
+          el.addEventListener('touchend', function (ev) {
+            // cancel long-press timer
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+            var now = Date.now();
+            var dateKey = el.getAttribute('data-date');
+            if (lastTap && (now - lastTap) < 300) {
+              // double-tap detected
+              lastTap = 0;
+              if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
+              openModal(dateKey);
+            } else {
+              // schedule single-tap action after delay to allow double-tap
+              lastTap = now;
+              if (tapTimer) clearTimeout(tapTimer);
+              tapTimer = setTimeout(function () {
+                toggleWorked(dateKey);
+                tapTimer = null;
+                lastTap = 0;
+              }, 300);
+            }
           });
-          el.addEventListener('touchend', function (ev) { if (pressTimer) clearTimeout(pressTimer); });
+
+          el.addEventListener('touchcancel', function () {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+            if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
+            lastTap = 0;
+          });
+
           el.addEventListener('contextmenu', function (e) { e.preventDefault(); openModal(this.getAttribute('data-date')); });
         });
 
