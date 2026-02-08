@@ -240,13 +240,14 @@
       .location-panel { padding: 10px; }
       #work-location-input { min-width: 120px; }
       /* switch to mobile list view (no horizontal scroll) */
-      #calendar { display: none; }
-      #calendar-mobile { display: block; }
+  #calendar { display: none !important; }
+  #calendar-mobile { display: block !important; }
       /* make table headers sticky on wide enough small screens when horizontally scrolled */
       .table-container { -webkit-overflow-scrolling: touch; }
     }
-    /* default: hide mobile container until used */
-    #calendar-mobile { display: none; }
+  /* default: show table calendar; hide mobile container until media query enables it */
+  #calendar { display: block !important; }
+  #calendar-mobile { display: none; }
     /* Mobile calendar styles */
     .calendar-mobile { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); padding: 8px; }
     .mobile-day { border-bottom: 1px solid #f0f0f0; padding: 10px 8px; display: flex; gap: 12px; align-items: flex-start; }
