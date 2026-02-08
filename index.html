@@ -109,13 +109,16 @@
       font-size: 0.75rem;
     }
     #calendar .events-list li {
-      padding: 2px 6px;
+      padding: 2px 4px;
       margin-bottom: 2px;
       background: #e8f4fc;
       border-radius: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal; /* allow wrapping so long labels fit */
+      overflow: visible;
+      text-overflow: clip;
+      font-size: 0.72rem; /* slightly smaller to fit in one cell */
+      line-height: 1.1;
+      word-break: break-word;
     }
   /* Holiday (설날 등) styling */
   #calendar td.holiday .day-num { color: #e74c3c; font-weight: 700; }
@@ -263,8 +266,8 @@
     .mobile-day .md-left .daynum { display: block; font-weight: 700; font-size: 1.1rem; margin-top: 4px; }
     .mobile-day .md-right { flex: 1; }
     .mobile-day .md-right .events { margin: 0; padding: 0; list-style: none; font-size: 0.95rem; }
-    .mobile-day .md-right .events li { background: #eef6ff; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px; }
-  .mobile-day .md-right .events li.holiday { background: #fdecea; color: #c0392b; }
+  .mobile-day .md-right .events li { background: #eef6ff; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px; font-size: 0.85rem; white-space: normal; word-break: break-word; }
+  .mobile-day .md-right .events li.holiday { background: #fdecea; color: #c0392b; font-size: 0.82rem; }
   .mobile-day .md-left.sunday .daynum { color: #e74c3c; }
   .mobile-day .md-left.saturday .daynum { color: #fff; }
   .mobile-day .md-left.sunday .weekday { color: #e74c3c; }
@@ -275,6 +278,29 @@
   </style>
 </head>
 <body>
+  <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyCgshuLYLupqRUJxUTq42lVZnMffNiVGaE",
+    authDomain: "my-pay-e0832.firebaseapp.com",
+    projectId: "my-pay-e0832",
+    storageBucket: "my-pay-e0832.firebasestorage.app",
+    messagingSenderId: "924559477057",
+    appId: "1:924559477057:web:994de57cdb5f93e217b9c0",
+    measurementId: "G-QV87MK3K0T"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
   <h1>📅 종찬 근무 일정표</h1>
 
   <div class="auth-panel" id="auth-panel">
