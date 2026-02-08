@@ -62,7 +62,7 @@
       font-weight: 600;
       text-align: center;
     }
-    #calendar th:last-child { color: #3498db; }
+  #calendar th:last-child { color: #fff; }
     #calendar td {
       padding: 0;
       border: 1px solid #eee;
@@ -266,9 +266,9 @@
     .mobile-day .md-right .events li { background: #eef6ff; padding: 6px 8px; border-radius: 6px; margin-bottom: 6px; }
   .mobile-day .md-right .events li.holiday { background: #fdecea; color: #c0392b; }
   .mobile-day .md-left.sunday .daynum { color: #e74c3c; }
-  .mobile-day .md-left.saturday .daynum { color: #3498db; }
+  .mobile-day .md-left.saturday .daynum { color: #fff; }
   .mobile-day .md-left.sunday .weekday { color: #e74c3c; }
-  .mobile-day .md-left.saturday .weekday { color: #3498db; }
+  .mobile-day .md-left.saturday .weekday { color: #fff; }
     .mobile-day .md-right .meta { font-size: 0.85rem; color: #4a90d9; font-weight: 600; margin-top: 6px; }
   /* hide view toggle for list-only mode */
   #toggle-view { display: none !important; }
@@ -615,7 +615,7 @@
         var py = String(year);
         if (PRECOMPUTED_LUNAR[py]) {
           var p = PRECOMPUTED_LUNAR[py];
-          if (p.seollal) addThreeDayRange(map, p.seollal, '설날', '설날 연휴');
+          if (p.seollal) addThreeDayRange(map, p.seollal, '설', '연휴');
           if (p.chuseok) addThreeDayRange(map, p.chuseok, '추석', '추석 연휴');
         }
 
