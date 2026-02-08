@@ -126,8 +126,7 @@
   /* Holiday (설날 등) styling */
   #calendar td.holiday .day-num { color: #e74c3c; font-weight: 700; }
   #calendar .events-list li.holiday { background: #fdecea; color: #c0392b; }
-  /* Small weekday label (e.g., '토') shown inside day cells */
-  .weekday-label { position: absolute; top: 6px; right: 8px; font-size: 0.65rem; color: #777; }
+  /* removed weekday-label inserted into day cells; headers already show 요일 */
     #modal-overlay {
       display: none;
       position: fixed;
@@ -518,6 +517,56 @@
         return y + '-' + m + '-' + d;
       }
 
+      // Precomputed main lunar holiday dates (Seollal and Chuseok) by year.
+      // We'll expand each main date into a 3-day range (day-1, day, day+1) when building the holiday map.
+      var PRECOMPUTED_LUNAR = {
+        '2023': { seollal: '2023-01-22', chuseok: '2023-09-29' },
+        '2024': { seollal: '2024-02-10', chuseok: '2024-09-17' },
+        '2025': { seollal: '2025-01-29', chuseok: '2025-10-06' },
+        '2026': { seollal: '2026-02-17', chuseok: '2026-09-25' },
+        '2027': { seollal: '2027-02-07', chuseok: '2027-09-15' },
+        '2028': { seollal: '2028-01-27', chuseok: '2028-10-03' },
+        '2029': { seollal: '2029-02-13', chuseok: '2029-09-22' },
+        '2030': { seollal: '2030-02-03', chuseok: '2030-09-12' },
+        '2031': { seollal: '2031-01-23', chuseok: '2031-10-01' },
+        '2032': { seollal: '2032-02-11', chuseok: '2032-09-19' }
+      };
+
+      // helper: add day offsets (-1,0,+1) for a base date into map
+      function addThreeDayRange(map, baseDateStr, mainLabel, adjLabel) {
+        var base = new Date(baseDateStr + 'T00:00:00');
+        for (var offset = -1; offset <= 1; offset++) {
+          var d = new Date(base);
+          d.setDate(base.getDate() + offset);
+          var k = dateKey(d);
+          map[k] = (offset === 0) ? mainLabel : adjLabel;
+        }
+      }
+
+      // Return map of dateKey -> holidayName for common Korean public holidays for the given year.
+      // This merges fixed-date holidays plus expanded lunar holidays from PRECOMPUTED_LUNAR.
+      function getNationalHolidays(year) {
+        var map = {};
+        // Fixed-date holidays (apply every year)
+        map[year + '-01-01'] = '신정'; // New Year's Day
+        map[year + '-03-01'] = '삼일절';
+        map[year + '-05-05'] = '어린이날';
+        map[year + '-06-06'] = '현충일';
+        map[year + '-08-15'] = '광복절';
+        map[year + '-10-03'] = '개천절';
+        map[year + '-10-09'] = '한글날';
+        map[year + '-12-25'] = '성탄절';
+
+        var py = String(year);
+        if (PRECOMPUTED_LUNAR[py]) {
+          var p = PRECOMPUTED_LUNAR[py];
+          if (p.seollal) addThreeDayRange(map, p.seollal, '설날', '설날 연휴');
+          if (p.chuseok) addThreeDayRange(map, p.chuseok, '추석', '추석 연휴');
+        }
+
+        return map;
+      }
+
       function renderHeader() {
         const el = document.getElementById('current-month');
         if (!el) return;
@@ -538,8 +587,9 @@
         const daysInMonth = last.getDate();
 
         const todayKey = dateKey(new Date());
-        const events = getEvents();
+  const events = getEvents();
         const locations = getWorkLocations();
+  const holidays = getNationalHolidays(y || currentDate.getFullYear());
         const workedSet = {};
         getWorkedDays().forEach(function (d) { workedSet[d] = true; });
 
@@ -556,14 +606,14 @@
               ? new Date(y, month, 1 - (startDay - i))
               : new Date(y, month + 1, dayCount - daysInMonth);
             const key = dateKey(otherDate);
-            const dayEvents = events[key] || [];
+            var dayEvents = (events[key] || []).slice();
+            // include holiday name for display (non-persistent)
+            if (holidays[key] && dayEvents.indexOf(holidays[key]) < 0) dayEvents.unshift(holidays[key]);
             const isToday = key === todayKey;
             const isWorked = workedSet[key];
-            // detect holiday if any event contains '설날'
-            const hasHolidayEvent = dayEvents.some(function(ev){ return /설날/i.test(ev); });
+            // detect holiday by holiday map or event text
+            const hasHolidayEvent = !!holidays[key] || dayEvents.some(function(ev){ return /설날|추석|연휴|신정|광복|한글|성탄/i.test(ev); });
             html += '<td class="day-cell other-month' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + '" data-date="' + key + '"><div class="day-cell-inner">';
-            // add weekday label for Saturday (positioned in corner)
-            if ((i % 7) === 6) html += '<span class="weekday-label">토</span>';
             html += '<span class="day-num">' + (i < startDay ? prevMonth.getDate() : (dayCount - daysInMonth)) + '</span>';
             if (dayEvents.length) {
               html += '<ul class="events-list">';
@@ -582,14 +632,12 @@
             if (i >= startDay && dayCount > daysInMonth) dayCount++;
           } else {
             const key = dateKey(new Date(y, month, dayCount));
-            const dayEvents = events[key] || [];
+            var dayEvents = (events[key] || []).slice();
+            if (holidays[key] && dayEvents.indexOf(holidays[key]) < 0) dayEvents.unshift(holidays[key]);
             const isToday = key === todayKey;
             const isWorked = workedSet[key];
-            const hasHolidayEvent = dayEvents.some(function(ev){ return /설날/i.test(ev); });
+            const hasHolidayEvent = !!holidays[key] || dayEvents.some(function(ev){ return /설날|추석|연휴|신정|광복|한글|성탄/i.test(ev); });
             html += '<td class="day-cell' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + '" data-date="' + key + '"><div class="day-cell-inner">';
-            // add weekday label for Saturday
-            // Calculate weekday index: first cell of a week is i%7 === 0 -> Sunday, so Saturday is i%7 === 6
-            if ((i % 7) === 6) html += '<span class="weekday-label">토</span>';
             html += '<span class="day-num">' + dayCount + '</span>';
             if (dayEvents.length) {
               html += '<ul class="events-list">';
