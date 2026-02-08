@@ -303,25 +303,7 @@
 </script>
   <h1>📅 종찬 근무 일정표</h1>
 
-  <div class="auth-panel" id="auth-panel">
-    <div id="auth-login-form">
-      <h2>🔐 로그인</h2>
-      <div class="auth-form">
-        <input type="email" id="auth-email" placeholder="이메일" autocomplete="email" />
-        <input type="password" id="auth-password" placeholder="비밀번호" autocomplete="current-password" />
-        <button type="button" class="btn-login" id="btn-login">로그인</button>
-        <button type="button" class="btn-signup" id="btn-signup">회원가입</button>
-      </div>
-      <div class="auth-msg" id="auth-msg"></div>
-    </div>
-    <div id="auth-logged-in" style="display:none;">
-      <div class="auth-status">
-        <span id="auth-user-email"></span>
-        <button type="button" class="btn-logout" id="btn-logout">로그아웃</button>
-      </div>
-      <div class="auth-msg" id="auth-msg-logged"></div>
-    </div>
-  </div>
+  <!-- 로그인 UI 제거: 앱은 익명으로 Firebase에 연결되어 사용자의 문서를 실시간으로 동기화합니다 -->
 
   <div id="main-content">
   <div class="salary-panel">
@@ -391,8 +373,16 @@
       // 1. https://console.firebase.google.com → 프로젝트 추가 → 앱(웹) 추가 → config 복사 후 아래에 붙여넣기
       // 2. Authentication → 로그인 방법 → 이메일/비밀번호 사용 설정
       // 3. Firestore 데이터베이스 만들기 → 규칙: users/{userId} 본인만 읽기/쓰기 허용 (예: allow read, write: if request.auth.uid == userId;)
-      var FIREBASE_CONFIG = null;
-      // 예: FIREBASE_CONFIG = { apiKey: "AIza...", authDomain: "myproject.firebaseapp.com", projectId: "myproject", storageBucket: "myproject.appspot.com", messagingSenderId: "123", appId: "1:123:web:abc" };
+      // Firebase config (copied from top module block). Set this to enable compat-mode Firebase usage below.
+      var FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCgshuLYLupqRUJxUTq42lVZnMffNiVGaE",
+        authDomain: "my-pay-e0832.firebaseapp.com",
+        projectId: "my-pay-e0832",
+        storageBucket: "my-pay-e0832.firebasestorage.app",
+        messagingSenderId: "924559477057",
+        appId: "1:924559477057:web:994de57cdb5f93e217b9c0",
+        measurementId: "G-QV87MK3K0T"
+      };
 
       const STORAGE_KEY = 'calendar_events';
       const WORKED_KEY = 'calendar_worked_days';
@@ -492,11 +482,34 @@
       }
 
       var authPanel = document.getElementById('auth-panel');
+      // track realtime listener so we can unsubscribe on logout
+      var __userDocUnsubscribe = null;
       if (initFirebase()) {
         firebaseAuth.onAuthStateChanged(function (user) {
           setAuthUI(!!user, user ? user.email : '');
+          // unsubscribe previous listener (if any)
+          try { if (__userDocUnsubscribe) { __userDocUnsubscribe(); __userDocUnsubscribe = null; } } catch (e) {}
           if (user) {
+            // initial load
             loadFromFirestore();
+            // attach realtime listener to user's document so remote changes update UI immediately
+            var ref = userDataRef();
+            if (ref && typeof ref.onSnapshot === 'function') {
+              __userDocUnsubscribe = ref.onSnapshot(function (snap) {
+                if (!snap.exists) return;
+                var d = snap.data() || {};
+                try {
+                  if (d.events) localStorage.setItem(STORAGE_KEY, JSON.stringify(d.events));
+                  if (d.workedDays) localStorage.setItem(WORKED_KEY, JSON.stringify(d.workedDays));
+                  if (d.dailyWage != null) localStorage.setItem(WAGE_KEY, String(d.dailyWage));
+                  if (d.workLocations) localStorage.setItem(LOCATIONS_KEY, JSON.stringify(d.workLocations));
+                } catch (err) { console.warn('apply snapshot failed', err); }
+                renderHeader(); renderCalendar(); updateSalarySummary();
+                if (selectedDate) updateLocationPanel(selectedDate);
+              }, function (err) {
+                console.warn('snapshot error', err);
+              });
+            }
           }
         });
       } else {
@@ -962,40 +975,16 @@
         });
       }
 
-      var btnLogin = document.getElementById('btn-login');
-      var btnSignup = document.getElementById('btn-signup');
-      var btnLogout = document.getElementById('btn-logout');
-      if (btnLogin && firebaseAuth && firebaseApp) {
-        btnLogin.addEventListener('click', function () {
-          var email = document.getElementById('auth-email').value.trim();
-          var password = document.getElementById('auth-password').value;
-          showAuthMsg('auth-msg', '');
-          if (!email || !password) { showAuthMsg('auth-msg', '이메일과 비밀번호를 입력하세요', true); return; }
-          firebaseAuth.signInWithEmailAndPassword(email, password).then(function () {
-            showAuthMsg('auth-msg', '로그인되었습니다', false);
-          }).catch(function (err) {
-            showAuthMsg('auth-msg', err.message || '로그인 실패', true);
+      // 로그인 UI 제거: 익명으로 Firebase에 접속해서 사용자 문서를 사용합니다.
+      // 자동으로 익명 로그인 시도 (이미 로그인된 경우에는 no-op)
+      if (initFirebase() && firebaseAuth) {
+        // sign in anonymously for simple sync usage
+        try {
+          firebaseAuth.signInAnonymously().catch(function (err) {
+            // 익명 로그인 실패는 콘솔에만 표기
+            console.warn('Anonymous sign-in failed', err);
           });
-        });
-      }
-      if (btnSignup && firebaseAuth && firebaseApp) {
-        btnSignup.addEventListener('click', function () {
-          var email = document.getElementById('auth-email').value.trim();
-          var password = document.getElementById('auth-password').value;
-          showAuthMsg('auth-msg', '');
-          if (!email || !password) { showAuthMsg('auth-msg', '이메일과 비밀번호를 입력하세요', true); return; }
-          if (password.length < 6) { showAuthMsg('auth-msg', '비밀번호는 6자 이상이어야 합니다', true); return; }
-          firebaseAuth.createUserWithEmailAndPassword(email, password).then(function () {
-            showAuthMsg('auth-msg', '회원가입되었습니다. 로그인 중...', false);
-          }).catch(function (err) {
-            showAuthMsg('auth-msg', err.message || '회원가입 실패', true);
-          });
-        });
-      }
-      if (btnLogout && firebaseAuth && firebaseApp) {
-        btnLogout.addEventListener('click', function () {
-          firebaseAuth.signOut();
-        });
+        } catch (e) { console.warn('anonymous sign-in error', e); }
       }
 
       document.getElementById('modal-close').addEventListener('click', closeModal);
