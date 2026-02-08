@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>캘린더 일정표</title>
+  <title>종찬 캘린더 일정표</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -71,7 +71,7 @@
       max-height: 100px;
     }
     #calendar .day-cell-inner {
-      height: 100%;
+  height: 100%;
       min-height: 100px;
       max-height: 100px;
       overflow: hidden;
@@ -79,6 +79,7 @@
       display: flex;
       flex-direction: column;
       box-sizing: border-box;
+  position: relative;
     }
     #calendar .day-cell-inner .day-num { flex-shrink: 0; }
     #calendar .day-cell-inner .events-list { flex-shrink: 1; min-height: 0; overflow: hidden; }
@@ -122,6 +123,11 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+  /* Holiday (설날 등) styling */
+  #calendar td.holiday .day-num { color: #e74c3c; font-weight: 700; }
+  #calendar .events-list li.holiday { background: #fdecea; color: #c0392b; }
+  /* Small weekday label (e.g., '토') shown inside day cells */
+  .weekday-label { position: absolute; top: 6px; right: 8px; font-size: 0.65rem; color: #777; }
     #modal-overlay {
       display: none;
       position: fixed;
@@ -250,8 +256,10 @@
   <div class="salary-panel">
     <h2>💰 일당 선택</h2>
     <div class="wage-options">
-      <label><input type="checkbox" id="wage-15" /> 15만원</label>
-      <label><input type="checkbox" id="wage-16" /> 16만원</label>
+      <label><input type="radio" name="wage" id="wage-17" /> 17만원</label>
+      <label><input type="radio" name="wage" id="wage-18" /> 18만원</label>
+      <label><input type="radio" name="wage" id="wage-19" /> 19만원</label>
+      <label><input type="radio" name="wage" id="wage-20" /> 20만원</label>
     </div>
     <div class="salary-summary" id="salary-summary">
       이번 달 출근 <strong id="worked-days-count">0</strong>일 · 예상 월급 <span class="amount" id="salary-amount">0원</span>
@@ -468,11 +476,16 @@
 
       function getDailyWage() {
         const w = localStorage.getItem(WAGE_KEY);
-        return w === '160000' ? 160000 : 150000;
+        // default to 170000 if not set
+        const num = w ? Number(w) : 170000;
+        // allow only 170000,180000,190000,200000
+        if ([170000,180000,190000,200000].indexOf(num) >= 0) return num;
+        return 170000;
       }
 
       function setDailyWage(value) {
-        localStorage.setItem(WAGE_KEY, String(value));
+        const v = Number(value) || 170000;
+        localStorage.setItem(WAGE_KEY, String(v));
         updateSalarySummary();
         syncToFirestore();
       }
@@ -546,12 +559,17 @@
             const dayEvents = events[key] || [];
             const isToday = key === todayKey;
             const isWorked = workedSet[key];
-            html += '<td class="day-cell other-month' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + '" data-date="' + key + '"><div class="day-cell-inner">';
+            // detect holiday if any event contains '설날'
+            const hasHolidayEvent = dayEvents.some(function(ev){ return /설날/i.test(ev); });
+            html += '<td class="day-cell other-month' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + '" data-date="' + key + '"><div class="day-cell-inner">';
+            // add weekday label for Saturday (positioned in corner)
+            if ((i % 7) === 6) html += '<span class="weekday-label">토</span>';
             html += '<span class="day-num">' + (i < startDay ? prevMonth.getDate() : (dayCount - daysInMonth)) + '</span>';
             if (dayEvents.length) {
               html += '<ul class="events-list">';
               dayEvents.slice(0, 3).forEach(function (ev) {
-                html += '<li>' + escapeHtml(ev) + '</li>';
+                var liClass = /설날/i.test(ev) ? ' class="holiday"' : '';
+                html += '<li' + liClass + '>' + escapeHtml(ev) + '</li>';
               });
               if (dayEvents.length > 3) html += '<li>+' + (dayEvents.length - 3) + '</li>';
               html += '</ul>';
@@ -567,12 +585,17 @@
             const dayEvents = events[key] || [];
             const isToday = key === todayKey;
             const isWorked = workedSet[key];
-            html += '<td class="day-cell' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + '" data-date="' + key + '"><div class="day-cell-inner">';
+            const hasHolidayEvent = dayEvents.some(function(ev){ return /설날/i.test(ev); });
+            html += '<td class="day-cell' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + '" data-date="' + key + '"><div class="day-cell-inner">';
+            // add weekday label for Saturday
+            // Calculate weekday index: first cell of a week is i%7 === 0 -> Sunday, so Saturday is i%7 === 6
+            if ((i % 7) === 6) html += '<span class="weekday-label">토</span>';
             html += '<span class="day-num">' + dayCount + '</span>';
             if (dayEvents.length) {
               html += '<ul class="events-list">';
               dayEvents.slice(0, 3).forEach(function (ev) {
-                html += '<li>' + escapeHtml(ev) + '</li>';
+                var liClass = /설날/i.test(ev) ? ' class="holiday"' : '';
+                html += '<li' + liClass + '>' + escapeHtml(ev) + '</li>';
               });
               if (dayEvents.length > 3) html += '<li>+' + (dayEvents.length - 3) + '</li>';
               html += '</ul>';
@@ -742,16 +765,19 @@
         if (e.key === 'Enter') { saveLocationInput(); e.preventDefault(); }
       });
 
-      var wage15 = document.getElementById('wage-15');
-      var wage16 = document.getElementById('wage-16');
+      var wage17 = document.getElementById('wage-17');
+      var wage18 = document.getElementById('wage-18');
+      var wage19 = document.getElementById('wage-19');
+      var wage20 = document.getElementById('wage-20');
       var w = getDailyWage();
-      wage15.checked = (w === 150000);
-      wage16.checked = (w === 160000);
-      wage15.addEventListener('change', function () {
-        if (wage15.checked) { wage16.checked = false; setDailyWage(150000); }
-      });
-      wage16.addEventListener('change', function () {
-        if (wage16.checked) { wage15.checked = false; setDailyWage(160000); }
+      wage17.checked = (w === 170000);
+      wage18.checked = (w === 180000);
+      wage19.checked = (w === 190000);
+      wage20.checked = (w === 200000);
+      [wage17, wage18, wage19, wage20].forEach(function (el) {
+        el.addEventListener('change', function () {
+          if (el.checked) setDailyWage((el.id === 'wage-17' ? 170000 : el.id === 'wage-18' ? 180000 : el.id === 'wage-19' ? 190000 : 200000));
+        });
       });
 
       renderHeader();
