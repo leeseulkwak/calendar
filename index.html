@@ -205,26 +205,7 @@
     .modal-row { margin-bottom: 16px; }
     .modal-row label { margin-bottom: 4px; }
     #worked-checkbox { width: 18px; height: 18px; margin-right: 8px; vertical-align: middle; cursor: pointer; }
-    .auth-panel {
-      background: #fff;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .auth-panel h2 { margin: 0 0 12px 0; font-size: 1rem; color: #555; }
-  .auth-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
-    .auth-form input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
-    .auth-form input[type="email"], .auth-form input[type="password"] { width: 180px; }
-    .auth-form button { padding: 10px 16px; border-radius: 8px; font-size: 0.95rem; cursor: pointer; border: none; }
-    .btn-login { background: #4a90d9; color: #fff; }
-    .btn-signup { background: #eee; color: #333; }
-    .btn-logout { background: #e74c3c; color: #fff; }
-    .auth-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-    .auth-status span { color: #555; font-size: 0.95rem; }
-    .auth-msg { font-size: 0.9rem; margin-top: 8px; min-height: 1.2em; }
-    .auth-msg.error { color: #c0392b; }
-    .auth-msg.success { color: #27ae60; }
+  /* auth UI styles removed (login UI deleted) */
     #main-content.hidden { display: none; }
     /* Mobile tweaks */
     @media (max-width: 480px) {
@@ -415,27 +396,14 @@
         el.className = 'auth-msg' + (isError ? ' error' : text ? ' success' : '');
       }
 
+      // Simplified: ensure main UI is always visible (login UI removed), only hide auth panel if present.
       function setAuthUI(loggedIn, email) {
-        var hasFirebase = !!(firebaseApp && firebaseAuth);
-        var loginForm = document.getElementById('auth-login-form');
-        var loggedInDiv = document.getElementById('auth-logged-in');
         var mainContent = document.getElementById('main-content');
         var authPanelEl = document.getElementById('auth-panel');
-        if (!hasFirebase) {
-          if (authPanelEl) authPanelEl.style.display = 'none';
-          if (mainContent) mainContent.classList.remove('hidden');
-          return;
-        }
-        if (authPanelEl) authPanelEl.style.display = 'block';
-        if (loginForm) loginForm.style.display = loggedIn ? 'none' : 'block';
-        if (loggedInDiv) {
-          loggedInDiv.style.display = loggedIn ? 'block' : 'none';
-          var emailEl = document.getElementById('auth-user-email');
-          if (emailEl) emailEl.textContent = (email || '') + ' 로그인 중';
-        }
-        if (mainContent) mainContent.classList.toggle('hidden', !loggedIn);
-        showAuthMsg('auth-msg', '');
-        showAuthMsg('auth-msg-logged', '');
+        // always show main content
+        if (mainContent) mainContent.classList.remove('hidden');
+        // hide any leftover auth panel
+        if (authPanelEl) authPanelEl.style.display = 'none';
       }
 
       function userDataRef() {
@@ -486,30 +454,85 @@
       var __userDocUnsubscribe = null;
       if (initFirebase()) {
         firebaseAuth.onAuthStateChanged(function (user) {
-          setAuthUI(!!user, user ? user.email : '');
+          // small diagnostics
+          try { console.log('onAuthStateChanged', user && user.uid, 'isAnonymous=', user && user.isAnonymous); } catch (e) {}
+          setAuthUI(!!user, user ? (user.email || (user.isAnonymous ? '익명' : '')) : '');
           // unsubscribe previous listener (if any)
           try { if (__userDocUnsubscribe) { __userDocUnsubscribe(); __userDocUnsubscribe = null; } } catch (e) {}
+
           if (user) {
-            // initial load
-            loadFromFirestore();
-            // attach realtime listener to user's document so remote changes update UI immediately
             var ref = userDataRef();
-            if (ref && typeof ref.onSnapshot === 'function') {
-              __userDocUnsubscribe = ref.onSnapshot(function (snap) {
-                if (!snap.exists) return;
-                var d = snap.data() || {};
-                try {
-                  if (d.events) localStorage.setItem(STORAGE_KEY, JSON.stringify(d.events));
-                  if (d.workedDays) localStorage.setItem(WORKED_KEY, JSON.stringify(d.workedDays));
-                  if (d.dailyWage != null) localStorage.setItem(WAGE_KEY, String(d.dailyWage));
-                  if (d.workLocations) localStorage.setItem(LOCATIONS_KEY, JSON.stringify(d.workLocations));
-                } catch (err) { console.warn('apply snapshot failed', err); }
-                renderHeader(); renderCalendar(); updateSalarySummary();
-                if (selectedDate) updateLocationPanel(selectedDate);
-              }, function (err) {
-                console.warn('snapshot error', err);
-              });
+            if (!ref) {
+              console.warn('userDataRef unavailable for user', user && user.uid);
+              loadFromFirestore();
+              return;
             }
+
+            // Check whether a server document exists. If not, migrate localStorage -> Firestore
+            ref.get().then(function (snap) {
+              if (snap.exists) {
+                console.log('Firestore: user doc exists, loading');
+                loadFromFirestore();
+              } else {
+                console.log('Firestore: user doc missing — attempting migration from localStorage');
+                // gather local data
+                var localEvents = localStorage.getItem(STORAGE_KEY);
+                var localWorked = localStorage.getItem(WORKED_KEY);
+                var localWage = localStorage.getItem(WAGE_KEY);
+                var localLocs = localStorage.getItem(LOCATIONS_KEY);
+                var hasLocal = !!(localEvents || localWorked || localWage || localLocs);
+                if (hasLocal) {
+                  var data = {};
+                  try { data.events = localEvents ? JSON.parse(localEvents) : {}; } catch (e) { data.events = {}; }
+                  try { data.workedDays = localWorked ? JSON.parse(localWorked) : []; } catch (e) { data.workedDays = []; }
+                  if (localWage) data.dailyWage = Number(localWage);
+                  try { data.workLocations = localLocs ? JSON.parse(localLocs) : {}; } catch (e) { data.workLocations = {}; }
+                  data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+                  ref.set(data, { merge: true }).then(function () {
+                    console.log('Migration: local -> Firestore success for user', user.uid);
+                    showAuthMsg('auth-msg-logged', '로컬 데이터가 서버에 동기화되었습니다', false);
+                    loadFromFirestore();
+                  }).catch(function (err) {
+                    console.warn('Migration save failed', err);
+                    showAuthMsg('auth-msg-logged', '서버 동기화 실패: ' + (err.message || ''), true);
+                    // still try to load (may be empty)
+                    loadFromFirestore();
+                  });
+                } else {
+                  // create an empty doc to enable future real-time sync and avoid surprising "missing" state
+                  ref.set({ updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }).then(function () {
+                    console.log('Created empty user doc for', user.uid);
+                    loadFromFirestore();
+                  }).catch(function (err) {
+                    console.warn('create empty doc failed', err);
+                    loadFromFirestore();
+                  });
+                }
+              }
+            }).catch(function (err) {
+              console.warn('Failed to read user doc', err);
+              loadFromFirestore();
+            }).finally(function () {
+              // attach realtime listener after the above get/possible migration is scheduled
+              try {
+                if (ref && typeof ref.onSnapshot === 'function') {
+                  __userDocUnsubscribe = ref.onSnapshot(function (snap) {
+                    if (!snap.exists) return;
+                    var d = snap.data() || {};
+                    try {
+                      if (d.events) localStorage.setItem(STORAGE_KEY, JSON.stringify(d.events));
+                      if (d.workedDays) localStorage.setItem(WORKED_KEY, JSON.stringify(d.workedDays));
+                      if (d.dailyWage != null) localStorage.setItem(WAGE_KEY, String(d.dailyWage));
+                      if (d.workLocations) localStorage.setItem(LOCATIONS_KEY, JSON.stringify(d.workLocations));
+                    } catch (err) { console.warn('apply snapshot failed', err); }
+                    renderHeader(); renderCalendar(); updateSalarySummary();
+                    if (selectedDate) updateLocationPanel(selectedDate);
+                  }, function (err) {
+                    console.warn('snapshot error', err);
+                  });
+                }
+              } catch (e) { console.warn('attach snapshot failed', e); }
+            });
           }
         });
       } else {
