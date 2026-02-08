@@ -404,6 +404,7 @@
         });
       }
 
+      var authPanel = document.getElementById('auth-panel');
       if (initFirebase()) {
         firebaseAuth.onAuthStateChanged(function (user) {
           setAuthUI(!!user, user ? user.email : '');
