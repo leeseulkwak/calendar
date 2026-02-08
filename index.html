@@ -54,7 +54,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
   /* Ensure weekday headers are visible on narrow screens by allowing horizontal scroll; enable smooth touch scrolling */
-  .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-container { display: block; }
     #calendar th {
       padding: 12px 8px;
       background: #4a90d9;
@@ -230,8 +230,16 @@
       #calendar-header button { padding: 8px 10px; font-size: 0.95rem; }
       #current-month { font-size: 1rem; }
       #calendar th { padding: 8px 6px; font-size: 0.85rem; }
-      #calendar .day-cell-inner { padding: 6px 6px; min-height: 72px; }
-      #calendar .day-cell .day-num { font-size: 0.95rem; }
+  /* compact day cells for mobile */
+  #calendar { font-size: 13px; }
+  #calendar .day-cell-inner { padding: 6px 6px; min-height: 64px; display: flex; flex-direction: row; align-items: flex-start; gap: 8px; }
+  #calendar .day-cell .day-num { font-size: 0.95rem; width: 26px; height: 26px; line-height: 26px; display: inline-block; text-align: center; border-radius: 50%; }
+  /* move metadata & events to the right and allow wrapping */
+  #calendar .day-cell-inner .events-list { flex: 1; font-size: 0.8rem; padding-left: 4px; max-height: none; overflow: visible; }
+  #calendar .day-cell-inner .events-list li { white-space: normal; background: #eef6ff; }
+  #calendar .day-cell-inner .day-work-label, #calendar .day-cell-inner .day-location { font-size: 0.78rem; padding-left: 4px; }
+  /* increase touch targets for header buttons */
+  #calendar-header button { padding: 10px 14px; }
       .wage-options { gap: 8px; }
       .wage-options label { font-size: 0.9rem; }
       #modal { padding: 16px; }
@@ -239,14 +247,12 @@
       .salary-panel { padding: 12px; }
       .location-panel { padding: 10px; }
       #work-location-input { min-width: 120px; }
-      /* switch to mobile list view (no horizontal scroll) */
-  #calendar { display: none !important; }
-  #calendar-mobile { display: block !important; }
-      /* make table headers sticky on wide enough small screens when horizontally scrolled */
-      .table-container { -webkit-overflow-scrolling: touch; }
+  /* (table remains visible; keep compact mobile table tweaks above) */
+  /* allow horizontal scrolling on narrow screens */
+  .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     }
   /* default: show table calendar; hide mobile container until media query enables it */
-  #calendar { display: block !important; }
+  #calendar { display: table !important; }
   #calendar-mobile { display: none; }
     /* Mobile calendar styles */
     .calendar-mobile { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); padding: 8px; }
@@ -264,6 +270,8 @@
   .mobile-day .md-left.sunday .weekday { color: #e74c3c; }
   .mobile-day .md-left.saturday .weekday { color: #3498db; }
     .mobile-day .md-right .meta { font-size: 0.85rem; color: #4a90d9; font-weight: 600; margin-top: 6px; }
+  /* hide view toggle for list-only mode */
+  #toggle-view { display: none !important; }
   </style>
 </head>
 <body>
@@ -307,7 +315,8 @@
 
   <div id="calendar-header">
     <button id="prev-month" type="button">◀ 이전</button>
-    <span id="current-month"></span>
+  <span id="current-month"></span>
+  <button id="toggle-view" type="button" title="뷰 전환">표/리스트</button>
     <button id="next-month" type="button">다음 ▶</button>
   </div>
 
@@ -362,6 +371,7 @@
       const STORAGE_KEY = 'calendar_events';
       const WORKED_KEY = 'calendar_worked_days';
       const WAGE_KEY = 'calendar_daily_wage';
+  const VIEW_KEY = 'calendar_view_pref';
       const LOCATIONS_KEY = 'calendar_work_locations';
       let currentDate = new Date();
       let selectedDate = null;
@@ -618,13 +628,39 @@
         const y = currentDate.getFullYear();
         const m = currentDate.getMonth() + 1;
         el.textContent = y + '년 ' + m + '월';
+        // keep calendar container visibility in sync with header render
+        var calEl = document.getElementById('calendar');
+        var calMobileEl = document.getElementById('calendar-mobile');
+        if (window.innerWidth <= 480) {
+          if (calEl) calEl.style.display = 'none';
+          if (calMobileEl) calMobileEl.style.display = 'block';
+        } else {
+          if (calEl) calEl.style.display = 'table';
+          if (calMobileEl) calMobileEl.style.display = 'none';
+        }
+      }
+
+      function getPreferredView() {
+        try { return localStorage.getItem(VIEW_KEY); } catch (e) { return null; }
+      }
+      function setPreferredView(v) {
+        try { if (v) localStorage.setItem(VIEW_KEY, v); else localStorage.removeItem(VIEW_KEY); } catch (e) {}
       }
 
       function renderCalendar() {
-        // If viewport is narrow, render mobile-optimized list view
-        if (window.innerWidth <= 480) {
+        // Explicitly toggle which calendar container is visible based on viewport
+        var calEl = document.getElementById('calendar');
+        var calMobileEl = document.getElementById('calendar-mobile');
+        var pref = getPreferredView(); // 'table' | 'list' | null
+        var useList = (pref === 'list') || (pref === null && window.innerWidth <= 480);
+        if (useList) {
+          if (calEl) calEl.style.display = 'none';
+          if (calMobileEl) calMobileEl.style.display = 'block';
           renderCalendarMobile();
           return;
+        } else {
+          if (calEl) calEl.style.display = 'table';
+          if (calMobileEl) calMobileEl.style.display = 'none';
         }
         const tbody = document.getElementById('calendar-body');
         if (!tbody) return;
@@ -763,7 +799,6 @@
             var leftClass = 'md-left';
             if (wd === 0) leftClass += ' sunday';
             if (wd === 6) leftClass += ' saturday';
-            html += '<div class="mobile-day" data-date="' + key + '">';
             html += '<div class="' + leftClass + '"><span class="weekday">' + weekdayLabel + '</span><span class="daynum">' + d + '</span></div>';
           html += '<div class="md-right">';
           if (dayEvents.length) {
@@ -889,6 +924,18 @@
       document.getElementById('prev-month').addEventListener('click', prevMonth);
       document.getElementById('next-month').addEventListener('click', nextMonth);
 
+      // view toggle button
+      var toggleViewBtn = document.getElementById('toggle-view');
+      if (toggleViewBtn) {
+        toggleViewBtn.addEventListener('click', function () {
+          var cur = getPreferredView();
+          if (cur === 'list') { setPreferredView('table'); }
+          else if (cur === 'table') { setPreferredView(null); }
+          else { setPreferredView('list'); }
+          renderHeader(); renderCalendar();
+        });
+      }
+
       var btnLogin = document.getElementById('btn-login');
       var btnSignup = document.getElementById('btn-signup');
       var btnLogout = document.getElementById('btn-logout');
@@ -965,8 +1012,10 @@
         });
       });
 
-      renderHeader();
-      renderCalendar();
+  // force table-only mode
+  setPreferredView('table');
+  renderHeader();
+  renderCalendar();
       updateSalarySummary();
       // Re-render on viewport changes so desktop/mobile view switches smoothly
       let __resizeTimer = null;
