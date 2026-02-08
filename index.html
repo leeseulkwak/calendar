@@ -254,6 +254,7 @@
   .mobile-day .md-left.sunday .weekday { color: #e74c3c; }
   .mobile-day .md-left.saturday .weekday { color: #fff; }
     .mobile-day .md-right .meta { font-size: 0.85rem; color: #4a90d9; font-weight: 600; margin-top: 6px; }
+    .day-extra-reason { font-size: 0.75rem; color: #666; margin-top: 4px; }
   /* hide view toggle for list-only mode */
   #toggle-view { display: none !important; }
   </style>
@@ -284,7 +285,7 @@
 </script>
   <h1>📅 종찬 근무 일정표</h1>
 
-  <!-- 로그인 UI 제거: 앱은 익명으로 Firebase에 연결되어 사용자의 문서를 실시간으로 동기화합니다 -->
+  <!-- 로그인 UI 제거: 자동 익명 로그인으로 Firebase와 실시간 동기화합니다 -->
 
   <div id="main-content">
   <div class="salary-panel">
@@ -333,11 +334,19 @@
       <h3 id="modal-title">일정 추가</h3>
       <label for="event-date">날짜</label>
       <input type="date" id="event-date" />
+      <label for="event-title">일정</label>
+      <input type="text" id="event-title" placeholder="일정을 입력하세요 (선택)" maxlength="50" />
+      <div class="modal-row">
+        <label for="event-extra">추가 수당 (원)</label>
+        <input type="text" id="event-extra" placeholder="예: 10000" />
+      </div>
+      <div class="modal-row">
+        <label for="event-extra-reason">사유</label>
+        <input type="text" id="event-extra-reason" placeholder="예: 야근 수당, 교통비" />
+      </div>
       <div class="modal-row">
         <label><input type="checkbox" id="worked-checkbox" /> 이 날 출근했어요</label>
       </div>
-      <label for="event-title">일정 내용</label>
-      <input type="text" id="event-title" placeholder="일정을 입력하세요 (선택)" maxlength="50" />
       <div style="margin-top:16px;">
         <button type="button" id="modal-close">취소</button>
         <button type="button" id="save-event">저장</button>
@@ -370,6 +379,7 @@
       const WAGE_KEY = 'calendar_daily_wage';
   const VIEW_KEY = 'calendar_view_pref';
       const LOCATIONS_KEY = 'calendar_work_locations';
+  const EXTRAS_KEY = 'calendar_daily_extras';
       let currentDate = new Date();
       let selectedDate = null;
       var firebaseApp = null;
@@ -396,13 +406,11 @@
         el.className = 'auth-msg' + (isError ? ' error' : text ? ' success' : '');
       }
 
-      // Simplified: ensure main UI is always visible (login UI removed), only hide auth panel if present.
+      // Simplified auth UI: always show main content and hide any leftover auth panel
       function setAuthUI(loggedIn, email) {
         var mainContent = document.getElementById('main-content');
         var authPanelEl = document.getElementById('auth-panel');
-        // always show main content
         if (mainContent) mainContent.classList.remove('hidden');
-        // hide any leftover auth panel
         if (authPanelEl) authPanelEl.style.display = 'none';
       }
 
@@ -420,6 +428,7 @@
           events: getEvents(),
           workedDays: getWorkedDays(),
           dailyWage: getDailyWage(),
+          extras: getDailyExtras(),
           workLocations: getWorkLocations(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -438,6 +447,7 @@
           if (d.events) localStorage.setItem(STORAGE_KEY, JSON.stringify(d.events));
           if (d.workedDays) localStorage.setItem(WORKED_KEY, JSON.stringify(d.workedDays));
           if (d.dailyWage != null) localStorage.setItem(WAGE_KEY, String(d.dailyWage));
+          if (d.extras) localStorage.setItem(EXTRAS_KEY, JSON.stringify(d.extras));
           if (d.workLocations) localStorage.setItem(LOCATIONS_KEY, JSON.stringify(d.workLocations));
           renderHeader();
           renderCalendar();
@@ -581,6 +591,36 @@
         syncToFirestore();
       }
 
+      function getDailyExtras() {
+        try {
+          const data = localStorage.getItem(EXTRAS_KEY);
+          const raw = data ? JSON.parse(data) : {};
+          // normalize legacy numeric values to { amount, reason }
+          const normalized = {};
+          Object.keys(raw || {}).forEach(function (k) {
+            var v = raw[k];
+            if (v == null) return;
+            // if stored as plain number or numeric string
+            if (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)))) {
+              normalized[k] = { amount: Number(v), reason: '' };
+            } else if (typeof v === 'object') {
+              var amt = 0;
+              if (v.amount != null) amt = Number(v.amount) || 0;
+              else if (v.value != null) amt = Number(v.value) || 0;
+              normalized[k] = { amount: amt, reason: String(v.reason || v.note || '') };
+            } else {
+              // unknown shape, skip
+            }
+          });
+          return normalized;
+        } catch (e) { return {}; }
+      }
+
+      function saveDailyExtras(extras) {
+        localStorage.setItem(EXTRAS_KEY, JSON.stringify(extras));
+        syncToFirestore();
+      }
+
       function syncToFirestore() {
         if (!userDataRef()) return;
         saveToFirestore().then(function () {
@@ -613,6 +653,7 @@
       function updateSalarySummary() {
         const wage = getDailyWage();
         const worked = getWorkedDays();
+        const extras = getDailyExtras();
         const y = currentDate.getFullYear();
         const m = currentDate.getMonth();
         const inMonth = worked.filter(function (dateStr) {
@@ -620,7 +661,11 @@
           return dy === y && dm === m + 1;
         });
         const count = inMonth.length;
-        const total = count * wage;
+        var total = count * wage;
+        // add extras for worked days in the current month
+        inMonth.forEach(function (ds) {
+          if (extras && extras[ds]) total += Number((extras[ds] && extras[ds].amount) != null ? extras[ds].amount : extras[ds]) || 0;
+        });
         const countEl = document.getElementById('worked-days-count');
         const amountEl = document.getElementById('salary-amount');
         if (countEl) countEl.textContent = count;
@@ -738,6 +783,7 @@
   const events = getEvents();
         const locations = getWorkLocations();
   const holidays = getNationalHolidays(y || currentDate.getFullYear());
+  const extras = getDailyExtras();
         const workedSet = {};
         getWorkedDays().forEach(function (d) { workedSet[d] = true; });
 
@@ -778,6 +824,14 @@
               if (dayEvents.length > 3) html += '<li>+' + (dayEvents.length - 3) + '</li>';
               html += '</ul>';
             }
+            if (extras[key]) {
+              var exObj = extras[key];
+              var exAmt = Number((exObj && exObj.amount) != null ? exObj.amount : exObj) || 0;
+              var exReason = (exObj && exObj.reason) ? String(exObj.reason) : '';
+              html += '<div class="day-extra"' + (exReason ? ' title="' + escapeHtml(exReason) + '"' : '') + '>' +
+                '+ ' + exAmt.toLocaleString() + '원' + (exReason ? '<div class="day-extra-reason">' + escapeHtml(exReason) + '</div>' : '') +
+                '</div>';
+            }
             if (isWorked) {
               html += '<span class="day-work-label">출근</span>';
               if (locations[key]) html += '<span class="day-location">' + escapeHtml(locations[key]) + '</span>';
@@ -807,6 +861,14 @@
               if (dayEvents.length > 3) html += '<li>+' + (dayEvents.length - 3) + '</li>';
               html += '</ul>';
             }
+            if (extras[key]) {
+              var exObj2 = extras[key];
+              var exAmt2 = Number((exObj2 && exObj2.amount) != null ? exObj2.amount : exObj2) || 0;
+              var exReason2 = (exObj2 && exObj2.reason) ? String(exObj2.reason) : '';
+              html += '<div class="day-extra"' + (exReason2 ? ' title="' + escapeHtml(exReason2) + '"' : '') + '>' +
+                '+ ' + exAmt2.toLocaleString() + '원' + (exReason2 ? '<div class="day-extra-reason">' + escapeHtml(exReason2) + '</div>' : '') +
+                '</div>';
+            }
             if (isWorked) {
               html += '<span class="day-work-label">출근</span>';
               if (locations[key]) html += '<span class="day-location">' + escapeHtml(locations[key]) + '</span>';
@@ -824,6 +886,11 @@
           cell.addEventListener('click', function () {
             toggleWorked(this.getAttribute('data-date'));
           });
+          cell.addEventListener('dblclick', function (e) {
+            e.stopPropagation();
+            openModal(this.getAttribute('data-date'));
+          });
+          cell.addEventListener('contextmenu', function (e) { e.preventDefault(); openModal(this.getAttribute('data-date')); });
         });
         updateSalarySummary();
       }
@@ -871,6 +938,12 @@
             });
             html += '</ul>';
           }
+          if (extras[key]) {
+            var exObjM = extras[key];
+            var exAmtM = Number((exObjM && exObjM.amount) != null ? exObjM.amount : exObjM) || 0;
+            var exReasonM = (exObjM && exObjM.reason) ? String(exObjM.reason) : '';
+            html += '<div class="meta">추가: +' + exAmtM.toLocaleString() + '원' + (exReasonM ? ' · ' + escapeHtml(exReasonM) : '') + '</div>';
+          }
           if (isWorked) {
             html += '<div class="meta">출근';
             if (locations[key]) html += ' · ' + escapeHtml(locations[key]);
@@ -886,6 +959,14 @@
           el.addEventListener('click', function () {
             toggleWorked(this.getAttribute('data-date'));
           });
+          el.addEventListener('dblclick', function (e) { e.stopPropagation(); openModal(this.getAttribute('data-date')); });
+          // long-press for mobile: 600ms
+          var pressTimer = null;
+          el.addEventListener('touchstart', function (ev) {
+            pressTimer = setTimeout(function () { openModal(el.getAttribute('data-date')); }, 600);
+          });
+          el.addEventListener('touchend', function (ev) { if (pressTimer) clearTimeout(pressTimer); });
+          el.addEventListener('contextmenu', function (e) { e.preventDefault(); openModal(this.getAttribute('data-date')); });
         });
 
         updateSalarySummary();
@@ -936,7 +1017,19 @@
 
       function openModal(dateStr) {
         document.getElementById('event-date').value = dateStr;
-        document.getElementById('event-title').value = '';
+  // prefill title with first event if present
+  var evs = (getEvents()[dateStr] || []);
+  document.getElementById('event-title').value = evs.length ? evs[0] : '';
+  // prefill extra if present
+  var ex = (getDailyExtras()[dateStr]);
+  if (ex) {
+    var amt = (ex.amount != null) ? ex.amount : ex;
+    document.getElementById('event-extra').value = amt ? String(amt) : '';
+    document.getElementById('event-extra-reason').value = ex.reason || '';
+  } else {
+    document.getElementById('event-extra').value = '';
+    document.getElementById('event-extra-reason').value = '';
+  }
         var worked = getWorkedDays().indexOf(dateStr) >= 0;
         document.getElementById('worked-checkbox').checked = worked;
         document.getElementById('modal-overlay').classList.add('show');
@@ -950,6 +1043,8 @@
       function onSaveEvent() {
         const dateStr = document.getElementById('event-date').value;
         const title = document.getElementById('event-title').value.trim();
+  const extraStr = document.getElementById('event-extra').value.trim();
+  const extraReason = document.getElementById('event-extra-reason').value.trim();
         const workedChecked = document.getElementById('worked-checkbox').checked;
         if (!dateStr) return;
 
@@ -965,6 +1060,17 @@
           events[dateStr].push(title);
           saveEvents(events);
         }
+
+        // save per-day extra (numeric). empty -> remove
+        var extras = getDailyExtras();
+        if (extraStr) {
+          var num = Number(extraStr.replace(/[^0-9.-]/g, '')) || 0;
+          if (num) extras[dateStr] = { amount: num, reason: extraReason || '' };
+          else delete extras[dateStr];
+        } else {
+          delete extras[dateStr];
+        }
+        saveDailyExtras(extras);
 
         closeModal();
         renderCalendar();
@@ -998,17 +1104,7 @@
         });
       }
 
-      // 로그인 UI 제거: 익명으로 Firebase에 접속해서 사용자 문서를 사용합니다.
-      // 자동으로 익명 로그인 시도 (이미 로그인된 경우에는 no-op)
-      if (initFirebase() && firebaseAuth) {
-        // sign in anonymously for simple sync usage
-        try {
-          firebaseAuth.signInAnonymously().catch(function (err) {
-            // 익명 로그인 실패는 콘솔에만 표기
-            console.warn('Anonymous sign-in failed', err);
-          });
-        } catch (e) { console.warn('anonymous sign-in error', e); }
-      }
+  // initFirebase already called; do NOT auto sign-in anonymously. Provide UI buttons for email login/signup.
 
       document.getElementById('modal-close').addEventListener('click', closeModal);
       document.getElementById('save-event').addEventListener('click', onSaveEvent);
@@ -1049,6 +1145,13 @@
           }
         });
       });
+
+      // No login UI: automatically sign in anonymously so Firestore sync works without interaction
+      if (initFirebase() && firebaseAuth) {
+        try {
+          firebaseAuth.signInAnonymously().catch(function (err) { console.warn('Anonymous sign-in failed', err); });
+        } catch (e) { console.warn('anonymous sign-in error', e); }
+      }
 
   // force table-only mode
   setPreferredView('table');
