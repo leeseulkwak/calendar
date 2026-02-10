@@ -324,34 +324,20 @@
   <div id="calendar-mobile" class="calendar-mobile"></div>
 
   <div class="salary-panel location-panel" id="location-panel">
-    <span id="location-date-label">날짜를 클릭한 뒤 출근 장소를 입력하세요</span>
-    <input type="text" id="work-location-input" placeholder="예: 강남점, 본사" maxlength="30" />
-  </div>
-  </div>
-
-  <div id="modal-overlay">
-    <div id="modal">
-      <h3 id="modal-title">일정 추가</h3>
-      <label for="event-date">날짜</label>
-      <input type="date" id="event-date" />
-      <label for="event-title">일정</label>
-      <input type="text" id="event-title" placeholder="일정을 입력하세요 (선택)" maxlength="50" />
-      <div class="modal-row">
-        <label for="event-extra">추가 수당 (원)</label>
-        <input type="text" id="event-extra" placeholder="예: 10000" />
-      </div>
-      <div class="modal-row">
-        <label for="event-extra-reason">사유</label>
-        <input type="text" id="event-extra-reason" placeholder="예: 야근 수당, 교통비" />
-      </div>
-      <div class="modal-row">
-        <label><input type="checkbox" id="worked-checkbox" /> 이 날 출근했어요</label>
-      </div>
-      <div style="margin-top:16px;">
-        <button type="button" id="modal-close">취소</button>
-        <button type="button" id="save-event">저장</button>
+    <div style="flex:1; min-width:220px;">
+      <span id="location-date-label">날짜를 클릭하세요</span>
+      <input type="text" id="work-location-input" placeholder="출근 장소 (예: 강남점, 본사)" maxlength="30" />
+  <!-- 일정 입력 영역 제거 (요청에 따라 표시하지 않음) -->
+      <label for="panel-event-extra" style="display:block;margin-top:8px;font-weight:600;">추가 비용 (원)</label>
+      <input type="text" id="panel-event-extra" placeholder="예: 10000" />
+      <label for="panel-event-extra-reason" style="display:block;margin-top:8px;font-weight:600;">사유</label>
+      <input type="text" id="panel-event-extra-reason" placeholder="예: 야근 수당, 교통비" />
+      <div style="margin-top:8px; display:flex; gap:8px;">
+  <button type="button" id="panel-save">저장</button>
+  <button type="button" id="panel-clear">초기화</button>
       </div>
     </div>
+  </div>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -815,15 +801,11 @@
             html += '<td class="day-cell other-month' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + extraClass + '" data-date="' + key + '"><div class="day-cell-inner">';
             // weekday label spans removed per user request
             html += '<span class="day-num">' + (i < startDay ? prevMonth.getDate() : (dayCount - daysInMonth)) + '</span>';
-            if (dayEvents.length) {
-              html += '<ul class="events-list">';
-              dayEvents.slice(0, 3).forEach(function (ev) {
-                var liClass = /설날/i.test(ev) ? ' class="holiday"' : '';
-                html += '<li' + liClass + '>' + escapeHtml(ev) + '</li>';
-              });
-              if (dayEvents.length > 3) html += '<li>+' + (dayEvents.length - 3) + '</li>';
-              html += '</ul>';
+            // show worked status, location, extras, then events
+            if (isWorked) {
+              html += '<span class="day-work-label">출근</span>';
             }
+            if (locations[key]) html += '<span class="day-location">' + escapeHtml(locations[key]) + '</span>';
             if (extras[key]) {
               var exObj = extras[key];
               var exAmt = Number((exObj && exObj.amount) != null ? exObj.amount : exObj) || 0;
@@ -832,9 +814,14 @@
                 '+ ' + exAmt.toLocaleString() + '원' + (exReason ? '<div class="day-extra-reason">' + escapeHtml(exReason) + '</div>' : '') +
                 '</div>';
             }
-            if (isWorked) {
-              html += '<span class="day-work-label">출근</span>';
-              if (locations[key]) html += '<span class="day-location">' + escapeHtml(locations[key]) + '</span>';
+            if (dayEvents.length) {
+              html += '<ul class="events-list">';
+              dayEvents.slice(0, 3).forEach(function (ev) {
+                var liClass = /설날/i.test(ev) ? ' class="holiday"' : '';
+                html += '<li' + liClass + '>' + escapeHtml(ev) + '</li>';
+              });
+              if (dayEvents.length > 3) html += '<li>+' + (dayEvents.length - 3) + '</li>';
+              html += '</ul>';
             }
             html += '</div></td>';
             if (i >= startDay && dayCount > daysInMonth) dayCount++;
@@ -852,15 +839,11 @@
             html += '<td class="day-cell' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + extraClass2 + '" data-date="' + key + '"><div class="day-cell-inner">';
             // weekday label spans removed per user request
             html += '<span class="day-num">' + dayCount + '</span>';
-            if (dayEvents.length) {
-              html += '<ul class="events-list">';
-              dayEvents.slice(0, 3).forEach(function (ev) {
-                var liClass = /설날/i.test(ev) ? ' class="holiday"' : '';
-                html += '<li' + liClass + '>' + escapeHtml(ev) + '</li>';
-              });
-              if (dayEvents.length > 3) html += '<li>+' + (dayEvents.length - 3) + '</li>';
-              html += '</ul>';
+            // show worked status, location, extras, then events
+            if (isWorked) {
+              html += '<span class="day-work-label">출근</span>';
             }
+            if (locations[key]) html += '<span class="day-location">' + escapeHtml(locations[key]) + '</span>';
             if (extras[key]) {
               var exObj2 = extras[key];
               var exAmt2 = Number((exObj2 && exObj2.amount) != null ? exObj2.amount : exObj2) || 0;
@@ -869,9 +852,14 @@
                 '+ ' + exAmt2.toLocaleString() + '원' + (exReason2 ? '<div class="day-extra-reason">' + escapeHtml(exReason2) + '</div>' : '') +
                 '</div>';
             }
-            if (isWorked) {
-              html += '<span class="day-work-label">출근</span>';
-              if (locations[key]) html += '<span class="day-location">' + escapeHtml(locations[key]) + '</span>';
+            if (dayEvents.length) {
+              html += '<ul class="events-list">';
+              dayEvents.slice(0, 3).forEach(function (ev) {
+                var liClass = /설날/i.test(ev) ? ' class="holiday"' : '';
+                html += '<li' + liClass + '>' + escapeHtml(ev) + '</li>';
+              });
+              if (dayEvents.length > 3) html += '<li>+' + (dayEvents.length - 3) + '</li>';
+              html += '</ul>';
             }
             html += '</div></td>';
             dayCount++;
@@ -884,13 +872,34 @@
 
         tbody.querySelectorAll('.day-cell').forEach(function (cell) {
           cell.addEventListener('click', function () {
-            toggleWorked(this.getAttribute('data-date'));
+            var d = this.getAttribute('data-date');
+            // toggle worked on single click
+            var worked = getWorkedDays();
+            var idx = worked.indexOf(d);
+            if (idx >= 0) {
+              // was worked -> remove
+              worked.splice(idx, 1);
+              saveWorkedDays(worked);
+              selectedDate = d; updateLocationPanel(d);
+            } else {
+              // not worked -> add
+              worked.push(d);
+              saveWorkedDays(worked);
+              selectedDate = d; updateLocationPanel(d);
+            }
+            // prefill panel (extras and location only)
+            var ex = getDailyExtras()[d];
+            if (ex) {
+              document.getElementById('panel-event-extra').value = ex.amount || '';
+              document.getElementById('panel-event-extra-reason').value = ex.reason || '';
+            } else {
+              document.getElementById('panel-event-extra').value = '';
+              document.getElementById('panel-event-extra-reason').value = '';
+            }
+            renderCalendar(); updateSalarySummary();
           });
-          cell.addEventListener('dblclick', function (e) {
-            e.stopPropagation();
-            openModal(this.getAttribute('data-date'));
-          });
-          cell.addEventListener('contextmenu', function (e) { e.preventDefault(); openModal(this.getAttribute('data-date')); });
+          // contextmenu selects date into panel
+          cell.addEventListener('contextmenu', function (e) { e.preventDefault(); selectedDate = this.getAttribute('data-date'); updateLocationPanel(selectedDate); });
         });
         updateSalarySummary();
       }
@@ -954,60 +963,26 @@
 
         container.innerHTML = html;
 
-        // touch-aware handlers: single tap = toggle worked, double-tap = open modal, long-press = open modal
+        // mobile: single tap toggles worked and selects date; long-press selects date
         container.querySelectorAll('.mobile-day').forEach(function (el) {
-          // non-touch fallback: click/dblclick still work
           el.addEventListener('click', function () {
-            toggleWorked(this.getAttribute('data-date'));
+            var d = this.getAttribute('data-date');
+            // toggle worked
+            var worked = getWorkedDays();
+            var idx = worked.indexOf(d);
+            if (idx >= 0) { worked.splice(idx, 1); saveWorkedDays(worked); }
+            else { worked.push(d); saveWorkedDays(worked); }
+            selectedDate = d; updateLocationPanel(d);
+            // prefill extras and location only
+            var ex3 = getDailyExtras()[d];
+            if (ex3) { document.getElementById('panel-event-extra').value = ex3.amount || ''; document.getElementById('panel-event-extra-reason').value = ex3.reason || ''; }
+            else { document.getElementById('panel-event-extra').value = ''; document.getElementById('panel-event-extra-reason').value = ''; }
+            renderCalendar(); updateSalarySummary();
           });
-          el.addEventListener('dblclick', function (e) { e.stopPropagation(); openModal(this.getAttribute('data-date')); });
-
-          // per-element touch timing state
-          var lastTap = 0;
-          var tapTimer = null;
           var pressTimer = null;
-
-          el.addEventListener('touchstart', function (ev) {
-            // start long-press timer
-            if (pressTimer) clearTimeout(pressTimer);
-            pressTimer = setTimeout(function () {
-              // open modal on long-press
-              openModal(el.getAttribute('data-date'));
-              // cancel any pending single-tap action
-              if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
-              lastTap = 0;
-            }, 600);
-          }, { passive: true });
-
-          el.addEventListener('touchend', function (ev) {
-            // cancel long-press timer
-            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-            var now = Date.now();
-            var dateKey = el.getAttribute('data-date');
-            if (lastTap && (now - lastTap) < 300) {
-              // double-tap detected
-              lastTap = 0;
-              if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
-              openModal(dateKey);
-            } else {
-              // schedule single-tap action after delay to allow double-tap
-              lastTap = now;
-              if (tapTimer) clearTimeout(tapTimer);
-              tapTimer = setTimeout(function () {
-                toggleWorked(dateKey);
-                tapTimer = null;
-                lastTap = 0;
-              }, 300);
-            }
-          });
-
-          el.addEventListener('touchcancel', function () {
-            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-            if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
-            lastTap = 0;
-          });
-
-          el.addEventListener('contextmenu', function (e) { e.preventDefault(); openModal(this.getAttribute('data-date')); });
+          el.addEventListener('touchstart', function () { if (pressTimer) clearTimeout(pressTimer); pressTimer = setTimeout(function () { var d = el.getAttribute('data-date'); selectedDate = d; updateLocationPanel(d); }, 600); }, { passive: true });
+          el.addEventListener('touchend', function () { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+          el.addEventListener('contextmenu', function (e) { e.preventDefault(); selectedDate = this.getAttribute('data-date'); updateLocationPanel(selectedDate); });
         });
 
         updateSalarySummary();
@@ -1056,66 +1031,21 @@
         return div.innerHTML;
       }
 
+      // Replace modal behavior: openModal now selects date into the side panel and prefills fields.
       function openModal(dateStr) {
-        document.getElementById('event-date').value = dateStr;
-  // prefill title with first event if present
-  var evs = (getEvents()[dateStr] || []);
-  document.getElementById('event-title').value = evs.length ? evs[0] : '';
-  // prefill extra if present
-  var ex = (getDailyExtras()[dateStr]);
-  if (ex) {
-    var amt = (ex.amount != null) ? ex.amount : ex;
-    document.getElementById('event-extra').value = amt ? String(amt) : '';
-    document.getElementById('event-extra-reason').value = ex.reason || '';
-  } else {
-    document.getElementById('event-extra').value = '';
-    document.getElementById('event-extra-reason').value = '';
-  }
-        var worked = getWorkedDays().indexOf(dateStr) >= 0;
-        document.getElementById('worked-checkbox').checked = worked;
-        document.getElementById('modal-overlay').classList.add('show');
-        document.getElementById('event-title').focus();
-      }
-
-      function closeModal() {
-        document.getElementById('modal-overlay').classList.remove('show');
-      }
-
-      function onSaveEvent() {
-        const dateStr = document.getElementById('event-date').value;
-        const title = document.getElementById('event-title').value.trim();
-  const extraStr = document.getElementById('event-extra').value.trim();
-  const extraReason = document.getElementById('event-extra-reason').value.trim();
-        const workedChecked = document.getElementById('worked-checkbox').checked;
-        if (!dateStr) return;
-
-        var worked = getWorkedDays();
-        var idx = worked.indexOf(dateStr);
-        if (workedChecked && idx < 0) worked.push(dateStr);
-        if (!workedChecked && idx >= 0) worked.splice(idx, 1);
-        saveWorkedDays(worked);
-
-        if (title) {
-          const events = getEvents();
-          if (!events[dateStr]) events[dateStr] = [];
-          events[dateStr].push(title);
-          saveEvents(events);
-        }
-
-        // save per-day extra (numeric). empty -> remove
-        var extras = getDailyExtras();
-        if (extraStr) {
-          var num = Number(extraStr.replace(/[^0-9.-]/g, '')) || 0;
-          if (num) extras[dateStr] = { amount: num, reason: extraReason || '' };
-          else delete extras[dateStr];
+        selectedDate = dateStr;
+        updateLocationPanel(dateStr);
+  // prefill panel fields (extras and location)
+  var ex = getDailyExtras()[dateStr];
+        if (ex) {
+          document.getElementById('panel-event-extra').value = ex.amount || '';
+          document.getElementById('panel-event-extra-reason').value = ex.reason || '';
         } else {
-          delete extras[dateStr];
+          document.getElementById('panel-event-extra').value = '';
+          document.getElementById('panel-event-extra-reason').value = '';
         }
-        saveDailyExtras(extras);
-
-        closeModal();
-        renderCalendar();
-        updateSalarySummary();
+  // focus the location input
+  var tloc = document.getElementById('work-location-input'); if (tloc) tloc.focus();
       }
 
       function prevMonth() {
@@ -1147,17 +1077,48 @@
 
   // initFirebase already called; do NOT auto sign-in anonymously. Provide UI buttons for email login/signup.
 
-      document.getElementById('modal-close').addEventListener('click', closeModal);
-      document.getElementById('save-event').addEventListener('click', onSaveEvent);
-      document.getElementById('modal-overlay').addEventListener('click', function (e) {
-        if (e.target === this) closeModal();
+      // Panel save/clear handlers (replacing modal)
+      document.getElementById('panel-save').addEventListener('click', function () {
+        if (!selectedDate) return;
+        var extraStr = document.getElementById('panel-event-extra').value.trim();
+        var extraReason = document.getElementById('panel-event-extra-reason').value.trim();
+        var loc = document.getElementById('work-location-input').value.trim();
+
+        // save extras
+        var extras = getDailyExtras();
+        if (extraStr) {
+          var num = Number(extraStr.replace(/[^0-9.-]/g, '')) || 0;
+          if (num) extras[selectedDate] = { amount: num, reason: extraReason || '' };
+          else delete extras[selectedDate];
+        } else {
+          delete extras[selectedDate];
+        }
+        saveDailyExtras(extras);
+
+        // save location
+        var locs = getWorkLocations();
+        if (loc) locs[selectedDate] = loc; else delete locs[selectedDate];
+        saveWorkLocations(locs);
+
+        renderCalendar();
+        updateSalarySummary();
       });
-      document.getElementById('event-title').addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') onSaveEvent();
+
+      document.getElementById('panel-clear').addEventListener('click', function () {
+        if (!selectedDate) return;
+        document.getElementById('panel-event-extra').value = '';
+        document.getElementById('panel-event-extra-reason').value = '';
+        document.getElementById('work-location-input').value = '';
+        // remove saved items
+        var events = getEvents(); if (events[selectedDate]) { delete events[selectedDate]; saveEvents(events); }
+        var extras = getDailyExtras(); if (extras[selectedDate]) { delete extras[selectedDate]; saveDailyExtras(extras); }
+        var locs = getWorkLocations(); if (locs[selectedDate]) { delete locs[selectedDate]; saveWorkLocations(locs); }
+        renderCalendar(); updateSalarySummary();
       });
+      // panel-event-title removed; no keydown handler needed
       document.getElementById('work-location-input').addEventListener('blur', saveLocationInput);
       document.getElementById('work-location-input').addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { saveLocationInput(); e.preventDefault(); }
+        if (e.key === 'Enter') { document.getElementById('panel-save').click(); e.preventDefault(); }
       });
 
       var wage15 = document.getElementById('wage-15');
