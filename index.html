@@ -957,9 +957,10 @@
         const startDay = first.getDay();
         const daysInMonth = last.getDate();
 
-        const events = getEvents();
-        const locations = getWorkLocations();
-        const holidays = getNationalHolidays(y || currentDate.getFullYear());
+  const events = getEvents();
+  const locations = getWorkLocations();
+  const extras = getDailyExtras();
+  const holidays = getNationalHolidays(y || currentDate.getFullYear());
         const workedSet = {};
         getWorkedDays().forEach(function (d) { workedSet[d] = true; });
 
