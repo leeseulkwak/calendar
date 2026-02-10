@@ -304,6 +304,15 @@
     padding-left: 6px;
     margin-top: 4px;
   }
+  /* Also ensure that marking a day as worked shows the same meta fields */
+  #calendar td.day-cell.worked .day-location,
+  #calendar td.day-cell.worked .day-extra,
+  #calendar td.day-cell.worked .day-work-label {
+    display: block !important;
+    text-align: left;
+    padding-left: 6px;
+    margin-top: 4px;
+  }
   </style>
 </head>
 <body>
@@ -853,12 +862,16 @@
             if (isWorked) {
               html += '<span class="day-work-label">출근</span>';
             }
-            if (locations[key]) html += '<span class="day-location">' + escapeHtml(locations[key]) + '</span>';
+            // decide visibility: show when worked or when this date is selected
+            var metaVisible = (isWorked || key === selectedDate);
+            var locStyle = metaVisible ? ' style="display:block;text-align:left;padding-left:6px;margin-top:4px;"' : ' style="display:none;"';
+            var extraStyle = metaVisible ? ' style="display:block;text-align:left;padding-left:6px;margin-top:4px;"' : ' style="display:none;"';
+            if (locations[key]) html += '<span class="day-location"' + locStyle + '>' + escapeHtml(locations[key]) + '</span>';
             if (extras[key]) {
               var exObj = extras[key];
               var exAmt = Number((exObj && exObj.amount) != null ? exObj.amount : exObj) || 0;
               var exReason = (exObj && exObj.reason) ? String(exObj.reason) : '';
-              html += '<div class="day-extra"' + (exReason ? ' title="' + escapeHtml(exReason) + '"' : '') + '>' +
+              html += '<div class="day-extra"' + extraStyle + (exReason ? ' title="' + escapeHtml(exReason) + '"' : '') + '>' +
                 '+ ' + exAmt.toLocaleString() + '원' + (exReason ? '<div class="day-extra-reason">' + escapeHtml(exReason) + '</div>' : '') +
                 '</div>';
             }
@@ -891,12 +904,16 @@
             if (isWorked) {
               html += '<span class="day-work-label">출근</span>';
             }
-            if (locations[key]) html += '<span class="day-location">' + escapeHtml(locations[key]) + '</span>';
+            // decide visibility: show when worked or when this date is selected
+            var metaVisible2 = (isWorked || key === selectedDate);
+            var locStyle2 = metaVisible2 ? ' style="display:block;text-align:left;padding-left:6px;margin-top:4px;"' : ' style="display:none;"';
+            var extraStyle2 = metaVisible2 ? ' style="display:block;text-align:left;padding-left:6px;margin-top:4px;"' : ' style="display:none;"';
+            if (locations[key]) html += '<span class="day-location"' + locStyle2 + '>' + escapeHtml(locations[key]) + '</span>';
             if (extras[key]) {
               var exObj2 = extras[key];
               var exAmt2 = Number((exObj2 && exObj2.amount) != null ? exObj2.amount : exObj2) || 0;
               var exReason2 = (exObj2 && exObj2.reason) ? String(exObj2.reason) : '';
-              html += '<div class="day-extra"' + (exReason2 ? ' title="' + escapeHtml(exReason2) + '"' : '') + '>' +
+              html += '<div class="day-extra"' + extraStyle2 + (exReason2 ? ' title="' + escapeHtml(exReason2) + '"' : '') + '>' +
                 '+ ' + exAmt2.toLocaleString() + '원' + (exReason2 ? '<div class="day-extra-reason">' + escapeHtml(exReason2) + '</div>' : '') +
                 '</div>';
             }
