@@ -104,6 +104,11 @@
       cursor: pointer;
       transition: background 0.15s;
     }
+  /* Table calendar: hide detailed meta by default to reduce clutter; show when a date is selected */
+  #calendar .day-location, #calendar .day-extra, #calendar .day-work-label { display: none; }
+  #calendar td.day-cell.selected .day-work-label,
+  #calendar td.day-cell.selected .day-location,
+  #calendar td.day-cell.selected .day-extra { display: block; text-align: left; padding-left: 6px; margin-top: 4px; }
     #calendar .day-cell:hover { background: #f8f9fa; }
     #calendar .events-list {
       list-style: none;
@@ -831,7 +836,7 @@
             var extraClass = '';
             if (weekdayIdx === 0) extraClass = ' sunday';
             if (weekdayIdx === 6) extraClass = ' saturday';
-            html += '<td class="day-cell other-month' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + extraClass + '" data-date="' + key + '"><div class="day-cell-inner">';
+            html += '<td class="day-cell other-month' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + extraClass + (key === selectedDate ? ' selected' : '') + '" data-date="' + key + '"><div class="day-cell-inner">';
             // weekday label spans removed per user request
             html += '<span class="day-num">' + (i < startDay ? prevMonth.getDate() : (dayCount - daysInMonth)) + '</span>';
             // show worked status, location, extras, then events
@@ -869,7 +874,7 @@
             var extraClass2 = '';
             if (weekdayIdx2 === 0) extraClass2 = ' sunday';
             if (weekdayIdx2 === 6) extraClass2 = ' saturday';
-            html += '<td class="day-cell' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + extraClass2 + '" data-date="' + key + '"><div class="day-cell-inner">';
+            html += '<td class="day-cell' + (isToday ? ' today' : '') + (isWorked ? ' worked' : '') + (hasHolidayEvent ? ' holiday' : '') + extraClass2 + (key === selectedDate ? ' selected' : '') + '" data-date="' + key + '"><div class="day-cell-inner">';
             // weekday label spans removed per user request
             html += '<span class="day-num">' + dayCount + '</span>';
             // show worked status, location, extras, then events
