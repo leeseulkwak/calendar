@@ -262,6 +262,25 @@
       white-space: normal; /* allow wrapping */
       word-break: break-word; /* break long words */
     }
+      /* small info tooltip panel for mobile: appears when user taps a meta element */
+      #info-tooltip {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 92px;
+        min-width: 160px;
+        max-width: 92%;
+        background: rgba(0,0,0,0.85);
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        z-index: 1200;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+        display: none;
+        word-break: break-word;
+      }
+      #info-tooltip.show { display: block; }
     .day-extra-reason { font-size: 0.75rem; color: #666; margin-top: 4px; }
   /* hide view toggle for list-only mode */
   #toggle-view { display: none !important; }
@@ -345,6 +364,7 @@
   <button type="button" id="panel-clear">초기화</button>
       </div>
     </div>
+      <div id="info-tooltip" role="status" aria-live="polite"></div>
   </div>
   </div>
 
@@ -910,6 +930,8 @@
           cell.addEventListener('contextmenu', function (e) { e.preventDefault(); selectedDate = this.getAttribute('data-date'); updateLocationPanel(selectedDate); });
         });
         updateSalarySummary();
+  // ensure meta handlers (tooltips) are attached after render
+  try { attachMetaHandlers(document); } catch (e) {}
       }
 
       // Mobile list-style calendar renderer (no horizontal scrolling)
@@ -995,6 +1017,8 @@
         });
 
         updateSalarySummary();
+  // attach meta handlers so tapping meta shows full text
+  try { attachMetaHandlers(container); } catch (e) {}
       }
 
       function updateLocationPanel(dateStr) {
@@ -1182,6 +1206,49 @@
         // small delay to allow orientation/layout to settle
         setTimeout(function () { renderHeader(); renderCalendar(); }, 220);
       });
+      // Tooltip helper for mobile/meta text visibility
+      (function () {
+        var tooltip = document.getElementById('info-tooltip');
+        var hideTimer = null;
+        function showTooltip(text) {
+          if (!tooltip) return;
+          tooltip.textContent = text;
+          tooltip.classList.add('show');
+          if (hideTimer) clearTimeout(hideTimer);
+          hideTimer = setTimeout(function () { tooltip.classList.remove('show'); hideTimer = null; }, 3500);
+        }
+        function attachMetaHandlers(root) {
+          if (!root) return;
+          root.querySelectorAll('.meta, .day-extra, .day-location, .day-work-label').forEach(function (el) {
+            // add title for native tooltip on desktop
+            if (!el.getAttribute('title')) {
+              el.setAttribute('title', el.textContent.trim());
+            }
+            // ensure tap/click shows tooltip on small screens
+            el.addEventListener('click', function (e) {
+              // on desktop, native title on hover is fine; show tooltip for touch devices as well
+              showTooltip(el.textContent.trim());
+              e.stopPropagation();
+            });
+            // also support touchstart to show quickly
+            el.addEventListener('touchstart', function (e) { showTooltip(el.textContent.trim()); e.stopPropagation(); }, { passive: true });
+          });
+        }
+        // Attach after each render
+        var __renderWrap = window.renderCalendar;
+        var __renderMobileWrap = window.renderCalendarMobile;
+        // Safely wrap render functions if they exist
+        if (typeof __renderWrap === 'function') {
+          window.renderCalendar = function () { __renderWrap(); attachMetaHandlers(document); };
+        }
+        if (typeof __renderMobileWrap === 'function') {
+          window.renderCalendarMobile = function () { __renderMobileWrap(); attachMetaHandlers(document.getElementById('calendar-mobile')); };
+        }
+        // also attach on initial load
+        setTimeout(function () { attachMetaHandlers(document); attachMetaHandlers(document.getElementById('calendar-mobile')); }, 300);
+        // hide tooltip when tapping elsewhere
+        document.addEventListener('click', function () { if (tooltip) tooltip.classList.remove('show'); });
+      })();
     })();
   </script>
 </body>
