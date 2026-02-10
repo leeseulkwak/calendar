@@ -46,7 +46,10 @@
     }
     #calendar {
       width: 100%;
-      table-layout: fixed;
+    table-layout: fixed;
+    /* ensure columns have more room on narrow viewports by providing a minimum table width
+      this allows horizontal scrolling in .table-container rather than truncating cell content */
+    min-width: 700px;
       border-collapse: collapse;
       background: #fff;
       border-radius: 12px;
@@ -234,6 +237,8 @@
   /* (table remains visible; keep compact mobile table tweaks above) */
   /* allow horizontal scrolling on narrow screens */
   .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* allow the table to shrink a bit on small screens while keeping columns readable */
+  #calendar { min-width: 560px; }
     }
   /* default: show table calendar; hide mobile container until media query enables it */
   #calendar { display: table !important; }
